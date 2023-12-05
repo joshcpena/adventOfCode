@@ -1,63 +1,89 @@
-use std::collections::BTreeMap;
+use nom::{
+    bytes::complete::tag,
+    character::complete::{self, digit1, line_ending, space0, space1},
+    multi::{fold_many1, separated_list1},
+    sequence::{delimited, separated_pair, terminated, tuple},
+    IResult, Parser,
+};
+use std::collections::{BTreeMap, HashSet};
+
+#[derive(Debug, Clone)]
+struct Card {
+    id: u32,
+    winners: HashSet<u32>,
+    scratched_numbers: HashSet<u32>,
+}
+
+fn into_set(input: &str) -> IResult<&str, HashSet<u32>> {
+    fold_many1(
+        terminated(complete::u32, space0),
+        HashSet::new,
+        |mut acc: HashSet<_>, elem| {
+            acc.insert(elem);
+            acc
+        },
+    )(input)
+}
+
+fn card(input: &str) -> IResult<&str, Card> {
+    let (input, id): (&str, &str) = delimited(
+        tuple((tag("Card"), space1)),
+        digit1,
+        tuple((tag(":"), space1)),
+    )(input)?;
+    separated_pair(into_set, tuple((tag("|"), space1)), into_set)
+        .map(|(winners, scratched_numbers)| Card {
+            id: id.parse().expect("this is a digit"),
+            winners,
+            scratched_numbers,
+        })
+        .parse(input)
+}
+fn parse(input: &str) -> IResult<&str, Vec<Card>> {
+    separated_list1(line_ending, card)(input)
+}
+impl Card {
+    fn part_1(&self) -> u32 {
+        let res = self.winners.intersection(&self.scratched_numbers).count();
+        match res.checked_sub(1) {
+            Some(num) => 2u32.pow(num as u32),
+            None => 0,
+        }
+    }
+    fn part_2(&self) -> (u32, u32) {
+        let score = self.winners.intersection(&self.scratched_numbers).count() as u32;
+        (self.id, score)
+    }
+}
 fn main() {
     let games = include_str!("./input.txt");
-    let scores: BTreeMap<i32, i32> = games
-        .lines()
-        .map(|line| {
-            let it = line.chars();
-            let id: i32 = it
-                .clone()
-                .skip_while(|c| !c.is_ascii_digit())
-                .take_while(|c| c.is_ascii_digit())
-                .collect::<String>()
-                .parse::<i32>()
-                .expect("ids are digits");
-            let winners = it
-                .clone()
-                .skip_while(|c| *c != ':')
-                .skip(1)
-                .take_while(|c| *c != '|')
-                .collect::<String>()
-                .split(" ")
-                .filter_map(|num| match num {
-                    "" => None,
-                    _ => Some(num.parse::<i32>().expect("winners are digits")),
-                })
-                .collect::<Vec<i32>>();
-            let scratched_nums = it
-                .clone()
-                .skip_while(|c| *c != '|')
-                .skip(1)
-                .take_while(|c| c.is_ascii())
-                .collect::<String>()
-                .split(" ")
-                .filter_map(|num| match num {
-                    "" => None,
-                    _ => Some(num.parse::<i32>().expect("winners are digits")),
-                })
-                .collect::<Vec<i32>>();
-            let sum_winners =
-                scratched_nums.iter().fold(
-                    0,
-                    |acc, x| {
-                        if winners.contains(x) {
-                            acc + 1
-                        } else {
-                            acc
-                        }
-                    },
-                );
-            (id, sum_winners)
-        })
-        .collect::<BTreeMap<i32, i32>>();
-    let mut res: BTreeMap<i32, i32> = BTreeMap::new();
-    scores.iter().for_each(|(k, v)| {
-        res.insert(*k, res.get(k).unwrap_or(&0) + 1);
-        for _ in 1..=*res.get(k).unwrap() {
-            for i in 1..=*v {
-                res.insert(*k + i, res.get(&(*k + i)).unwrap_or(&0) + 1);
+    let (_, parsed) = parse(games).expect("parse worked");
+    println!(
+        "Part 1: {:?}",
+        parsed.iter().map(|card| card.part_1()).sum::<u32>()
+    );
+    let data = parsed
+        .iter()
+        .map(|card| card.part_2())
+        .collect::<Vec<(u32, u32)>>();
+
+    let scores = parsed
+        .iter()
+        .map(|card| (card.id, 1))
+        .collect::<BTreeMap<u32, u32>>();
+
+    let res = data
+        .iter()
+        .fold(scores, |mut acc, (id, score)| {
+            let curr = *acc.get(id).expect("id in struct");
+            for i in (*id + 1)..(*id + 1 + *score) {
+                acc.entry(i).and_modify(|count| {
+                    *count += curr;
+                });
             }
-        }
-    });
-    println!("part 2 {:?}:", res.values().sum::<i32>());
+            acc
+        })
+        .values()
+        .sum::<u32>();
+    println!("Part 2: {:?}", res);
 }
