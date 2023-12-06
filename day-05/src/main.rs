@@ -1,4 +1,4 @@
-use indicatif::{ProgressBar, ProgressIterator};
+use indicatif::ParallelProgressIterator;
 use nom::{
     bytes::complete::{tag, take_until},
     character::complete::{self, line_ending, newline, space0, space1},
@@ -6,6 +6,7 @@ use nom::{
     sequence::{preceded, terminated, tuple},
     IResult,
 };
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::collections::{HashMap, HashSet};
 
 fn parse_line(input: &str) -> IResult<&str, Vec<usize>> {
@@ -64,20 +65,15 @@ fn main() {
         }
     }
     let x = part_2_seeds
-        .iter()
+        .par_iter()
         .map(|seed| {
             maps.iter().fold(*seed as i64, |mut acc, map| {
-                for map in map.iter() {
-                    let mut was_found = false;
+                'outer: for map in map.iter() {
                     for key in map.keys() {
                         if key.0 as i64 <= acc && key.1 as i64 >= acc {
                             acc += *map.get(key).unwrap() as i64;
-                            was_found = true;
-                            break;
+                            break 'outer;
                         }
-                    }
-                    if was_found {
-                        break;
                     }
                 }
                 acc
