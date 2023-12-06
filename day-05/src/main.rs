@@ -7,7 +7,7 @@ use nom::{
     IResult,
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 fn parse_line(input: &str) -> IResult<&str, Vec<usize>> {
     preceded(
