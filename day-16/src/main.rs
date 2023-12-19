@@ -9,7 +9,7 @@ struct Point {
 }
 
 fn part_1(start: Point, dir: Point, grid: &Vec<Vec<char>>) -> usize {
-    let mut visited: HashMap<Vec<Point>, u32> = HashMap::new();
+    let mut visited: Vec<(Point, Point)> = Vec::new();
     let mut queue: VecDeque<(Point, Point)> = VecDeque::new();
     queue.push_back((start, dir));
     let mut counter = 0;
@@ -27,13 +27,10 @@ fn part_1(start: Point, dir: Point, grid: &Vec<Vec<char>>) -> usize {
         {
             continue;
         }
-        visited
-            .entry(vec![current_point])
-            .and_modify(|counter| *counter += 1)
-            .or_insert(1);
-        if visited[&vec![current_point]] > 200 {
+        if visited.contains(&(current_point, direction)) {
             continue;
         }
+        visited.push((current_point, direction));
         match grid[current_point.y as usize][current_point.x as usize] {
             '.' => {
                 let next_point = Point {
@@ -159,7 +156,12 @@ fn part_1(start: Point, dir: Point, grid: &Vec<Vec<char>>) -> usize {
             _ => panic!("some shit went down"),
         }
     }
-    visited.len()
+    let mut unique_points = visited
+        .iter()
+        .map(|vec: &(Point, Point)| vec.0)
+        .unique()
+        .collect_vec();
+    unique_points.len()
 }
 
 fn main() {
